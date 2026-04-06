@@ -9,6 +9,8 @@ const STAGE = {
 }
 
 const SESSION_STORAGE_KEY = 'birthday-quest-session-v1'
+const TIME_FORMAT = /^\d{2}-\d{2}$/
+const DATE_FORMAT = /^\d{2}-\d{2}-\d{4}$/
 
 const normalizeText = (value) => value.trim().toLowerCase()
 const isValidStage = (value) => Object.values(STAGE).includes(value)
@@ -91,6 +93,15 @@ function App() {
 
   const handleGateSubmit = (event) => {
     event.preventDefault()
+
+    const timeValue = birthTime.trim()
+    const dateValue = birthDate.trim()
+    const formatValid = TIME_FORMAT.test(timeValue) && DATE_FORMAT.test(dateValue)
+
+    if (!formatValid) {
+      setGateError('Неверный формат. Используй HH-MM и DD-MM-YYYY.')
+      return
+    }
 
     const validTime = normalizeText(birthTime) === normalizeText(BIRTHDAY_GATE.time)
     const validDate = normalizeText(birthDate) === normalizeText(BIRTHDAY_GATE.date)
@@ -177,8 +188,6 @@ function App() {
                 value={birthTime}
                 onChange={(event) => setBirthTime(event.target.value)}
                 autoComplete="off"
-                pattern="\\d{2}-\\d{2}"
-                title="Используй формат HH-MM, например 09-45"
                 required
               />
             </label>
@@ -191,8 +200,6 @@ function App() {
                 value={birthDate}
                 onChange={(event) => setBirthDate(event.target.value)}
                 autoComplete="off"
-                pattern="\\d{2}-\\d{2}-\\d{4}"
-                title="Используй формат DD-MM-YYYY, например 24-12-2004"
                 required
               />
             </label>
