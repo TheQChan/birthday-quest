@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { BIRTHDAY_GATE, QUESTS } from './data/quests'
 
 const STAGE = {
@@ -8,16 +8,48 @@ const STAGE = {
   FINISH: 'finish'
 }
 
+const SESSION_STORAGE_KEY = 'birthday-quest-session-v1'
+
 const normalizeText = (value) => value.trim().toLowerCase()
+const isValidStage = (value) => Object.values(STAGE).includes(value)
+
+const getInitialSession = () => {
+  if (typeof window === 'undefined') {
+    return { stage: STAGE.WELCOME, currentQuestIndex: 0 }
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY)
+    if (!raw) {
+      return { stage: STAGE.WELCOME, currentQuestIndex: 0 }
+    }
+
+    const parsed = JSON.parse(raw)
+    const safeStage = isValidStage(parsed.stage) ? parsed.stage : STAGE.WELCOME
+    const maxQuestIndex = Math.max(QUESTS.length - 1, 0)
+    const safeQuestIndex = Number.isInteger(parsed.currentQuestIndex)
+      ? Math.min(Math.max(parsed.currentQuestIndex, 0), maxQuestIndex)
+      : 0
+
+    if (!QUESTS.length && safeStage === STAGE.QUESTS) {
+      return { stage: STAGE.FINISH, currentQuestIndex: 0 }
+    }
+
+    return { stage: safeStage, currentQuestIndex: safeQuestIndex }
+  } catch {
+    return { stage: STAGE.WELCOME, currentQuestIndex: 0 }
+  }
+}
 
 function App() {
-  const [stage, setStage] = useState(STAGE.WELCOME)
+  const initialSession = getInitialSession()
+  const [stage, setStage] = useState(initialSession.stage)
 
   const [birthTime, setBirthTime] = useState('')
   const [birthDate, setBirthDate] = useState('')
   const [gateError, setGateError] = useState('')
 
-  const [currentQuestIndex, setCurrentQuestIndex] = useState(0)
+  const [currentQuestIndex, setCurrentQuestIndex] = useState(initialSession.currentQuestIndex)
   const [questAnswer, setQuestAnswer] = useState('')
   const [questError, setQuestError] = useState('')
 
@@ -27,6 +59,18 @@ function App() {
     if (QUESTS.length === 0) return 100
     return Math.round((completedCount / QUESTS.length) * 100)
   }, [completedCount])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    window.localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({
+        stage,
+        currentQuestIndex
+      })
+    )
+  }, [stage, currentQuestIndex])
 
   const handleGateSubmit = (event) => {
     event.preventDefault()
@@ -201,6 +245,9 @@ function App() {
           <button
             className="btn btn-primary"
             onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.localStorage.removeItem(SESSION_STORAGE_KEY)
+              }
               setCurrentQuestIndex(0)
               setQuestAnswer('')
               setQuestError('')
