@@ -55,6 +55,7 @@ function App() {
 
   const [birthTime, setBirthTime] = useState('')
   const [birthDate, setBirthDate] = useState('')
+  const [dollarPrice, setDollarPrice] = useState('')
   const [gateError, setGateError] = useState('')
 
   const [currentQuestIndex, setCurrentQuestIndex] = useState(initialSession.currentQuestIndex)
@@ -93,15 +94,17 @@ function App() {
 
     const validTime = normalizeText(birthTime) === normalizeText(BIRTHDAY_GATE.time)
     const validDate = normalizeText(birthDate) === normalizeText(BIRTHDAY_GATE.date)
+    const validDollarRate = BIRTHDAY_GATE.dollarRates.includes(normalizeText(dollarPrice))
 
-    if (!validTime || !validDate) {
-      setGateError('Неверно. Попробуй еще раз: формат 00:00 и 8-4-2005.')
+    if (!validTime || !validDate || !validDollarRate) {
+      setGateError('Неверно. Проверь формат и попробуй еще раз.')
       return
     }
 
     setGateError('')
     setBirthDate('')
     setBirthTime('')
+    setDollarPrice('')
     setSelectedQuestIndex(currentQuestIndex)
     setStage(QUESTS.length ? STAGE.QUESTS : STAGE.FINISH)
   }
@@ -152,7 +155,7 @@ function App() {
           <p className="eyebrow">Birthday Quest</p>
           <h1>С днем рождения, Илья</h1>
           <p className="lead-text">
-            Если ты Илья и у тебя день рождения, нажми кнопку, чтобы войти в квест.
+            Если ты Илья и у тебя день рождения, нажми кнопку, чтобы получить доступ к контенту на сайте.
           </p>
           <button className="btn btn-primary" onClick={() => setStage(STAGE.ACCESS)}>
             Войти
@@ -162,18 +165,20 @@ function App() {
 
       {stage === STAGE.ACCESS && (
         <section className="card form-card">
-          <h2>Проверка доступа</h2>
-          <p className="muted">Во сколько ты родился? Формат: часы:минуты и день-месяц-год</p>
+          <h2>Проверка Ильинности</h2>
+          <p className="muted">Заполни поля в формате HH-MM и DD-MM-YYYY, затем укажи цену доллара.</p>
 
           <form onSubmit={handleGateSubmit} className="form-stack">
             <label className="field">
               <span>Время рождения</span>
               <input
                 type="text"
-                placeholder="00:00"
+                placeholder="12-30"
                 value={birthTime}
                 onChange={(event) => setBirthTime(event.target.value)}
                 autoComplete="off"
+                pattern="\\d{2}-\\d{2}"
+                title="Используй формат HH-MM, например 09-45"
                 required
               />
             </label>
@@ -182,9 +187,23 @@ function App() {
               <span>Дата рождения</span>
               <input
                 type="text"
-                placeholder="8-4-2005"
+                placeholder="15-09-2001"
                 value={birthDate}
                 onChange={(event) => setBirthDate(event.target.value)}
+                autoComplete="off"
+                pattern="\\d{2}-\\d{2}-\\d{4}"
+                title="Используй формат DD-MM-YYYY, например 24-12-2004"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Цена доллара</span>
+              <input
+                type="text"
+                placeholder="Например: 30"
+                value={dollarPrice}
+                onChange={(event) => setDollarPrice(event.target.value)}
                 autoComplete="off"
                 required
               />
