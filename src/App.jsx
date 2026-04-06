@@ -15,29 +15,37 @@ const isValidStage = (value) => Object.values(STAGE).includes(value)
 
 const getInitialSession = () => {
   if (typeof window === 'undefined') {
-    return { stage: STAGE.WELCOME, currentQuestIndex: 0 }
+    return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0 }
   }
 
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY)
     if (!raw) {
-      return { stage: STAGE.WELCOME, currentQuestIndex: 0 }
+      return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0 }
     }
 
     const parsed = JSON.parse(raw)
     const safeStage = isValidStage(parsed.stage) ? parsed.stage : STAGE.WELCOME
     const maxQuestIndex = Math.max(QUESTS.length - 1, 0)
+
     const safeQuestIndex = Number.isInteger(parsed.currentQuestIndex)
       ? Math.min(Math.max(parsed.currentQuestIndex, 0), maxQuestIndex)
       : 0
 
+    const rawSelectedQuestIndex = Number.isInteger(parsed.selectedQuestIndex) ? parsed.selectedQuestIndex : 0
+    const safeSelectedQuestIndex = Math.min(Math.max(rawSelectedQuestIndex, 0), safeQuestIndex)
+
     if (!QUESTS.length && safeStage === STAGE.QUESTS) {
-      return { stage: STAGE.FINISH, currentQuestIndex: 0 }
+      return { stage: STAGE.FINISH, currentQuestIndex: 0, selectedQuestIndex: 0 }
     }
 
-    return { stage: safeStage, currentQuestIndex: safeQuestIndex }
+    return {
+      stage: safeStage,
+      currentQuestIndex: safeQuestIndex,
+      selectedQuestIndex: safeSelectedQuestIndex
+    }
   } catch {
-    return { stage: STAGE.WELCOME, currentQuestIndex: 0 }
+    return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0 }
   }
 }
 
@@ -50,15 +58,22 @@ function App() {
   const [gateError, setGateError] = useState('')
 
   const [currentQuestIndex, setCurrentQuestIndex] = useState(initialSession.currentQuestIndex)
+  const [selectedQuestIndex, setSelectedQuestIndex] = useState(initialSession.selectedQuestIndex)
   const [questAnswer, setQuestAnswer] = useState('')
   const [questError, setQuestError] = useState('')
 
-  const currentQuest = QUESTS[currentQuestIndex]
-  const completedCount = currentQuestIndex
+  const selectedQuest = QUESTS[selectedQuestIndex]
+  const completedCount = Math.min(currentQuestIndex, QUESTS.length)
   const progressPercent = useMemo(() => {
     if (QUESTS.length === 0) return 100
     return Math.round((completedCount / QUESTS.length) * 100)
   }, [completedCount])
+
+  useEffect(() => {
+    if (selectedQuestIndex > currentQuestIndex) {
+      setSelectedQuestIndex(currentQuestIndex)
+    }
+  }, [currentQuestIndex, selectedQuestIndex])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -67,10 +82,11 @@ function App() {
       SESSION_STORAGE_KEY,
       JSON.stringify({
         stage,
-        currentQuestIndex
+        currentQuestIndex,
+        selectedQuestIndex
       })
     )
-  }, [stage, currentQuestIndex])
+  }, [stage, currentQuestIndex, selectedQuestIndex])
 
   const handleGateSubmit = (event) => {
     event.preventDefault()
@@ -86,12 +102,14 @@ function App() {
     setGateError('')
     setBirthDate('')
     setBirthTime('')
+    setSelectedQuestIndex(currentQuestIndex)
     setStage(QUESTS.length ? STAGE.QUESTS : STAGE.FINISH)
   }
 
   const handleQuestSubmit = (event) => {
     event.preventDefault()
 
+    const currentQuest = QUESTS[currentQuestIndex]
     if (!currentQuest) {
       setStage(STAGE.FINISH)
       return
@@ -113,7 +131,16 @@ function App() {
     }
 
     setCurrentQuestIndex(nextQuest)
+    setSelectedQuestIndex(nextQuest)
   }
+
+  const handleTimelineClick = (index) => {
+    if (index > currentQuestIndex) return
+    setQuestError('')
+    setSelectedQuestIndex(index)
+  }
+
+  const isSelectedCurrent = selectedQuestIndex === currentQuestIndex
 
   return (
     <main className="page-wrap">
@@ -193,46 +220,73 @@ function App() {
             </div>
           </div>
 
-          <ul className="quest-list">
+          <div className="timeline" role="list" aria-label="Квест-таймлайн">
+            <div className="timeline-line" aria-hidden="true" />
             {QUESTS.map((quest, index) => {
               const isDone = index < currentQuestIndex
-              const isActive = index === currentQuestIndex
+              const isCurrent = index === currentQuestIndex
               const isLocked = index > currentQuestIndex
+              const isSelected = index === selectedQuestIndex
 
               return (
-                <li
+                <article
                   key={quest.id}
-                  className={`quest-item ${isDone ? 'done' : ''} ${isActive ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
+                  className={`timeline-item ${index % 2 === 0 ? 'left' : 'right'} ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''} ${isLocked ? 'locked' : ''} ${isSelected ? 'selected' : ''}`}
+                  role="listitem"
                 >
-                  <p className="quest-title">{quest.title}</p>
-                  <p className="quest-state">
-                    {isDone && 'Выполнен'}
-                    {isActive && 'Текущий'}
-                    {isLocked && 'Закрыт'}
-                  </p>
-                </li>
+                  <button
+                    type="button"
+                    className="timeline-node"
+                    onClick={() => handleTimelineClick(index)}
+                    disabled={isLocked}
+                    aria-label={`${quest.title}. ${isCurrent ? 'Текущий квест' : isDone ? 'Выполнен' : 'Закрыт'}`}
+                  />
+
+                  <button
+                    type="button"
+                    className="timeline-card"
+                    onClick={() => handleTimelineClick(index)}
+                    disabled={isLocked}
+                  >
+                    <p className="timeline-title">{quest.title}</p>
+                    <p className="timeline-status">
+                      {isDone && 'Выполнен'}
+                      {isCurrent && 'Текущий'}
+                      {isLocked && 'Закрыт'}
+                    </p>
+                  </button>
+                </article>
               )
             })}
-          </ul>
+          </div>
 
-          {currentQuest && (
-            <form onSubmit={handleQuestSubmit} className="form-stack quest-form">
-              <label className="field">
-                <span>{currentQuest.question}</span>
-                <input
-                  type="text"
-                  placeholder="Твой ответ"
-                  value={questAnswer}
-                  onChange={(event) => setQuestAnswer(event.target.value)}
-                  autoComplete="off"
-                  required
-                />
-              </label>
-              {questError && <p className="error-text">{questError}</p>}
-              <button type="submit" className="btn btn-primary">
-                Ответить
-              </button>
-            </form>
+          {selectedQuest && (
+            <div className="quest-detail">
+              <p className="quest-detail-title">{selectedQuest.title}</p>
+              <p className="quest-detail-question">{selectedQuest.question}</p>
+
+              {isSelectedCurrent ? (
+                <form onSubmit={handleQuestSubmit} className="form-stack quest-form">
+                  <label className="field">
+                    <span>Ответ</span>
+                    <input
+                      type="text"
+                      placeholder="Твой ответ"
+                      value={questAnswer}
+                      onChange={(event) => setQuestAnswer(event.target.value)}
+                      autoComplete="off"
+                      required
+                    />
+                  </label>
+                  {questError && <p className="error-text">{questError}</p>}
+                  <button type="submit" className="btn btn-primary">
+                    Ответить
+                  </button>
+                </form>
+              ) : (
+                <p className="muted">Этот квест уже выполнен. Выбери светящийся узел текущего квеста для ответа.</p>
+              )}
+            </div>
           )}
         </section>
       )}
@@ -249,6 +303,7 @@ function App() {
                 window.localStorage.removeItem(SESSION_STORAGE_KEY)
               }
               setCurrentQuestIndex(0)
+              setSelectedQuestIndex(0)
               setQuestAnswer('')
               setQuestError('')
               setStage(STAGE.WELCOME)
