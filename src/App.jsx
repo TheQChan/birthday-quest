@@ -177,7 +177,7 @@ function App() {
       {stage === STAGE.ACCESS && (
         <section className="card form-card">
           <h2>Проверка Ильинности</h2>
-          <p className="muted">Заполни поля в формате HH-MM и DD-MM-YYYY, затем укажи цену доллара.</p>
+          <p className="muted">Заполни поля в формате HH-MM и DD-MM-YYYY, затем укажи цену доллара в момент твоего рождения.</p>
 
           <form onSubmit={handleGateSubmit} className="form-stack">
             <label className="field">
@@ -232,7 +232,8 @@ function App() {
 
       {stage === STAGE.QUESTS && (
         <section className="card roadmap-card">
-          <h2>Роадмап квеста</h2>
+          <h2>Неебический Квест</h2>
+          <p className="muted">Привет, Илья! Этот Неебический Квест создан специально в честь дня твоего рождения. Проходи задания и в конце тебя ждет маленький бонус.</p>
 
           <div className="progress-shell">
             <div className="progress-meta">

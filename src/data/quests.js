@@ -1,5 +1,5 @@
 ﻿export const BIRTHDAY_GATE = {
-  time: '00-00',
+  time: '23-00',
   date: '08-04-2005',
   dollarRates: ['27', '28']
 }
