@@ -19,6 +19,12 @@ const DATE_FORMAT = /^\d{2}-\d{2}-\d{4}$/
 
 const normalizeText = (value) => value.trim().toLowerCase()
 const isValidStage = (value) => Object.values(STAGE).includes(value)
+const resolveAssetPath = (path) => {
+  if (!path) return ''
+  if (/^(https?:)?\/\//.test(path)) return path
+  const normalizedPath = path.replace(/^\/+/, '')
+  return `${import.meta.env.BASE_URL}${normalizedPath}`
+}
 
 const getQuestAnswerOptions = (quest) => {
   if (Array.isArray(quest?.answers) && quest.answers.length > 0) {
@@ -474,7 +480,7 @@ function App() {
                     <div className="followup-wrap">
                       <div className="quest-photo-card">
                         <img
-                          src={currentQuest.followUp.imagePath}
+                          src={resolveAssetPath(currentQuest.followUp.imagePath)}
                           alt={`Подсказка для ${currentQuest.title}`}
                           className="quest-photo"
                         />

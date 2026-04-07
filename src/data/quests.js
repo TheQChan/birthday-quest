@@ -17,7 +17,7 @@ export const QUESTS = [
     question: 'Назови место где ты можешь находится до 23:00',
     answers: ['общага', 'общежитие', 'дрочильня'],
     followUp: {
-      imagePath: '/quest-images/photo_2026-04-07_17-23-47.jpg',
+      imagePath: 'quest-images/photo_2026-04-07_17-23-47.jpg',
       coordinates: '55.702922, 37.531407',
       prompt: 'Напиши здесь то, что там найдешь',
       answers: ['ключ', 'красный ключ']
