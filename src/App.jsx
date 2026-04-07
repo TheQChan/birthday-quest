@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { BIRTHDAY_GATE, QUESTS } from './data/quests'
 
 const STAGE = {
@@ -19,6 +19,7 @@ const DATE_FORMAT = /^\d{2}-\d{2}-\d{4}$/
 
 const normalizeText = (value) => value.trim().toLowerCase()
 const isValidStage = (value) => Object.values(STAGE).includes(value)
+
 const getQuestAnswerOptions = (quest) => {
   if (Array.isArray(quest?.answers) && quest.answers.length > 0) {
     return quest.answers.map((answer) => normalizeText(String(answer)))
@@ -81,6 +82,8 @@ const getInitialSession = () => {
 
 function App() {
   const initialSession = getInitialSession()
+  const feedbackTimerRef = useRef(null)
+
   const [stage, setStage] = useState(initialSession.stage)
 
   const [birthTime, setBirthTime] = useState('')
@@ -91,14 +94,17 @@ function App() {
   const [currentQuestIndex, setCurrentQuestIndex] = useState(initialSession.currentQuestIndex)
   const [selectedQuestIndex, setSelectedQuestIndex] = useState(initialSession.selectedQuestIndex)
   const [questPhase, setQuestPhase] = useState(initialSession.questPhase || QUEST_PHASE.PRIMARY)
+
   const [questAnswer, setQuestAnswer] = useState('')
   const [followUpAnswer, setFollowUpAnswer] = useState('')
   const [questError, setQuestError] = useState('')
   const [followUpError, setFollowUpError] = useState('')
+  const [detailFx, setDetailFx] = useState('')
 
   const selectedQuest = QUESTS[selectedQuestIndex]
   const currentQuest = QUESTS[currentQuestIndex]
   const currentQuestHasFollowUp = Boolean(currentQuest?.followUp)
+
   const completedCount = Math.min(currentQuestIndex, QUESTS.length)
   const progressPercent = useMemo(() => {
     if (QUESTS.length === 0) return 100
@@ -130,6 +136,36 @@ function App() {
       })
     )
   }, [stage, currentQuestIndex, selectedQuestIndex, questPhase])
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current)
+      }
+    }
+  }, [])
+
+  const triggerDetailFx = (type) => {
+    setDetailFx(type)
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current)
+    }
+    feedbackTimerRef.current = setTimeout(() => {
+      setDetailFx('')
+    }, 520)
+  }
+
+  const gotoNextQuest = () => {
+    const nextQuest = currentQuestIndex + 1
+    if (nextQuest >= QUESTS.length) {
+      setStage(STAGE.FINISH)
+      return
+    }
+
+    setCurrentQuestIndex(nextQuest)
+    setSelectedQuestIndex(nextQuest)
+    setQuestPhase(QUEST_PHASE.PRIMARY)
+  }
 
   const handleGateSubmit = (event) => {
     event.preventDefault()
@@ -174,11 +210,13 @@ function App() {
     const isCorrect = validAnswers.includes(userAnswer)
     if (!isCorrect) {
       setQuestError('Ответ неверный. Подумай еще.')
+      triggerDetailFx('error')
       return
     }
 
     setQuestError('')
     setQuestAnswer('')
+    triggerDetailFx('success')
 
     if (currentQuestHasFollowUp) {
       setFollowUpAnswer('')
@@ -187,15 +225,7 @@ function App() {
       return
     }
 
-    const nextQuest = currentQuestIndex + 1
-    if (nextQuest >= QUESTS.length) {
-      setStage(STAGE.FINISH)
-      return
-    }
-
-    setCurrentQuestIndex(nextQuest)
-    setSelectedQuestIndex(nextQuest)
-    setQuestPhase(QUEST_PHASE.PRIMARY)
+    gotoNextQuest()
   }
 
   const handleFollowUpSubmit = (event) => {
@@ -210,21 +240,14 @@ function App() {
     const isCorrect = validAnswers.includes(userAnswer)
     if (!isCorrect) {
       setFollowUpError('Второй ответ неверный. Проверь место и попробуй снова.')
+      triggerDetailFx('error')
       return
     }
 
     setFollowUpError('')
     setFollowUpAnswer('')
-
-    const nextQuest = currentQuestIndex + 1
-    if (nextQuest >= QUESTS.length) {
-      setStage(STAGE.FINISH)
-      return
-    }
-
-    setCurrentQuestIndex(nextQuest)
-    setSelectedQuestIndex(nextQuest)
-    setQuestPhase(QUEST_PHASE.PRIMARY)
+    triggerDetailFx('success')
+    gotoNextQuest()
   }
 
   const handleTimelineClick = (index) => {
@@ -232,6 +255,59 @@ function App() {
     setQuestError('')
     setFollowUpError('')
     setSelectedQuestIndex(index)
+  }
+
+  const downloadCertificate = () => {
+    if (typeof window === 'undefined') return
+
+    const canvas = document.createElement('canvas')
+    canvas.width = 1600
+    canvas.height = 900
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+    gradient.addColorStop(0, '#1a0407')
+    gradient.addColorStop(0.55, '#54080f')
+    gradient.addColorStop(1, '#120305')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    const glow = ctx.createRadialGradient(280, 180, 10, 280, 180, 380)
+    glow.addColorStop(0, 'rgba(255, 78, 78, 0.45)')
+    glow.addColorStop(1, 'rgba(255, 78, 78, 0)')
+    ctx.fillStyle = glow
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    ctx.strokeStyle = 'rgba(255, 170, 170, 0.55)'
+    ctx.lineWidth = 3
+    ctx.strokeRect(60, 60, canvas.width - 120, canvas.height - 120)
+
+    ctx.fillStyle = '#ffd8d8'
+    ctx.font = '700 46px Manrope'
+    ctx.fillText('СЕРТИФИКАТ ПРОХОЖДЕНИЯ', 120, 190)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '900 92px Manrope'
+    ctx.fillText('ИЛЬЯ', 120, 330)
+
+    ctx.fillStyle = '#ffe8e8'
+    ctx.font = '600 44px Manrope'
+    ctx.fillText('Прошел Неебический Квест', 120, 420)
+
+    ctx.fillStyle = '#ffbcbc'
+    ctx.font = '500 36px Manrope'
+    ctx.fillText(`Квестов закрыто: ${QUESTS.length}`, 120, 500)
+    ctx.fillText(`Дата: ${new Date().toLocaleDateString('ru-RU')}`, 120, 560)
+
+    ctx.fillStyle = '#ffd8d8'
+    ctx.font = '500 28px Manrope'
+    ctx.fillText('Birthday Quest', 120, 760)
+
+    const link = document.createElement('a')
+    link.download = 'birthday-quest-certificate.png'
+    link.href = canvas.toDataURL('image/png')
+    link.click()
   }
 
   const isSelectedCurrent = selectedQuestIndex === currentQuestIndex
@@ -314,7 +390,7 @@ function App() {
         <section className="card roadmap-card">
           <h2>Неебический Квест</h2>
           <p className="muted">Привет, Илья! Этот Неебический Квест создан специально в честь дня твоего рождения. Пройди все задания и в конце тебя ждет маленький бонус.</p>
-          <br></br>
+
           <div className="progress-shell">
             <div className="progress-meta">
               <span>
@@ -368,7 +444,7 @@ function App() {
           </div>
 
           {selectedQuest && (
-            <div className="quest-detail">
+            <div className={`quest-detail ${detailFx === 'success' ? 'quest-detail--success' : ''} ${detailFx === 'error' ? 'quest-detail--error' : ''}`}>
               <p className="quest-detail-title">{selectedQuest.title}</p>
               <p className="quest-detail-question">{selectedQuest.question}</p>
 
@@ -402,6 +478,7 @@ function App() {
                           alt={`Подсказка для ${currentQuest.title}`}
                           className="quest-photo"
                         />
+                        <p className="quest-photo-caption">Локация подсказки</p>
                       </div>
                       <p className="followup-coordinates">
                         Координаты: <strong>{currentQuest.followUp.coordinates}</strong>
@@ -436,28 +513,42 @@ function App() {
       )}
 
       {stage === STAGE.FINISH && (
-        <section className="card finish-card">
+        <section className="card finish-card certificate-card">
           <p className="eyebrow">Mission Complete</p>
           <h2>Квест завершен</h2>
           <p className="lead-text">С днем рождения, Илья! Пусть этот год будет ярким и сильным.</p>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.localStorage.removeItem(SESSION_STORAGE_KEY)
-              }
-              setCurrentQuestIndex(0)
-              setSelectedQuestIndex(0)
-              setQuestPhase(QUEST_PHASE.PRIMARY)
-              setQuestAnswer('')
-              setFollowUpAnswer('')
-              setQuestError('')
-              setFollowUpError('')
-              setStage(STAGE.WELCOME)
-            }}
-          >
-            Пройти снова
-          </button>
+          
+          <div className="certificate-preview">
+            <p className="certificate-label">Сертификат</p>
+            <p className="certificate-name">Илья</p>
+            <p className="certificate-meta">Пройдено квестов: {QUESTS.length}</p>
+            <p className="certificate-meta">Дата: {new Date().toLocaleDateString('ru-RU')}</p>
+          </div>
+          <br></br>
+          <div className="action-row action-row--center">
+            <button className="btn btn-ghost" onClick={downloadCertificate}>
+              Скачать сертификат
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.localStorage.removeItem(SESSION_STORAGE_KEY)
+                }
+                setCurrentQuestIndex(0)
+                setSelectedQuestIndex(0)
+                setQuestPhase(QUEST_PHASE.PRIMARY)
+                setQuestAnswer('')
+                setFollowUpAnswer('')
+                setQuestError('')
+                setFollowUpError('')
+                setDetailFx('')
+                setStage(STAGE.WELCOME)
+              }}
+            >
+              Пройти снова
+            </button>
+          </div>
         </section>
       )}
     </main>
