@@ -8,22 +8,46 @@ const STAGE = {
   FINISH: 'finish'
 }
 
+const QUEST_PHASE = {
+  PRIMARY: 'primary',
+  FOLLOW_UP: 'follow_up'
+}
+
 const SESSION_STORAGE_KEY = 'birthday-quest-session-v1'
 const TIME_FORMAT = /^\d{2}-\d{2}$/
 const DATE_FORMAT = /^\d{2}-\d{2}-\d{4}$/
 
 const normalizeText = (value) => value.trim().toLowerCase()
 const isValidStage = (value) => Object.values(STAGE).includes(value)
+const getQuestAnswerOptions = (quest) => {
+  if (Array.isArray(quest?.answers) && quest.answers.length > 0) {
+    return quest.answers.map((answer) => normalizeText(String(answer)))
+  }
+
+  if (typeof quest?.answer === 'string' && quest.answer.trim().length > 0) {
+    return [normalizeText(quest.answer)]
+  }
+
+  return []
+}
+
+const getFollowUpAnswerOptions = (quest) => {
+  if (Array.isArray(quest?.followUp?.answers) && quest.followUp.answers.length > 0) {
+    return quest.followUp.answers.map((answer) => normalizeText(String(answer)))
+  }
+
+  return []
+}
 
 const getInitialSession = () => {
   if (typeof window === 'undefined') {
-    return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0 }
+    return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0, questPhase: QUEST_PHASE.PRIMARY }
   }
 
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY)
     if (!raw) {
-      return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0 }
+      return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0, questPhase: QUEST_PHASE.PRIMARY }
     }
 
     const parsed = JSON.parse(raw)
@@ -36,18 +60,22 @@ const getInitialSession = () => {
 
     const rawSelectedQuestIndex = Number.isInteger(parsed.selectedQuestIndex) ? parsed.selectedQuestIndex : 0
     const safeSelectedQuestIndex = Math.min(Math.max(rawSelectedQuestIndex, 0), safeQuestIndex)
+    const safeQuestPhase = Object.values(QUEST_PHASE).includes(parsed.questPhase)
+      ? parsed.questPhase
+      : QUEST_PHASE.PRIMARY
 
     if (!QUESTS.length && safeStage === STAGE.QUESTS) {
-      return { stage: STAGE.FINISH, currentQuestIndex: 0, selectedQuestIndex: 0 }
+      return { stage: STAGE.FINISH, currentQuestIndex: 0, selectedQuestIndex: 0, questPhase: QUEST_PHASE.PRIMARY }
     }
 
     return {
       stage: safeStage,
       currentQuestIndex: safeQuestIndex,
-      selectedQuestIndex: safeSelectedQuestIndex
+      selectedQuestIndex: safeSelectedQuestIndex,
+      questPhase: safeQuestPhase
     }
   } catch {
-    return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0 }
+    return { stage: STAGE.WELCOME, currentQuestIndex: 0, selectedQuestIndex: 0, questPhase: QUEST_PHASE.PRIMARY }
   }
 }
 
@@ -62,10 +90,15 @@ function App() {
 
   const [currentQuestIndex, setCurrentQuestIndex] = useState(initialSession.currentQuestIndex)
   const [selectedQuestIndex, setSelectedQuestIndex] = useState(initialSession.selectedQuestIndex)
+  const [questPhase, setQuestPhase] = useState(initialSession.questPhase || QUEST_PHASE.PRIMARY)
   const [questAnswer, setQuestAnswer] = useState('')
+  const [followUpAnswer, setFollowUpAnswer] = useState('')
   const [questError, setQuestError] = useState('')
+  const [followUpError, setFollowUpError] = useState('')
 
   const selectedQuest = QUESTS[selectedQuestIndex]
+  const currentQuest = QUESTS[currentQuestIndex]
+  const currentQuestHasFollowUp = Boolean(currentQuest?.followUp)
   const completedCount = Math.min(currentQuestIndex, QUESTS.length)
   const progressPercent = useMemo(() => {
     if (QUESTS.length === 0) return 100
@@ -79,6 +112,12 @@ function App() {
   }, [currentQuestIndex, selectedQuestIndex])
 
   useEffect(() => {
+    if (!currentQuestHasFollowUp && questPhase === QUEST_PHASE.FOLLOW_UP) {
+      setQuestPhase(QUEST_PHASE.PRIMARY)
+    }
+  }, [currentQuestHasFollowUp, questPhase])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
 
     window.localStorage.setItem(
@@ -86,10 +125,11 @@ function App() {
       JSON.stringify({
         stage,
         currentQuestIndex,
-        selectedQuestIndex
+        selectedQuestIndex,
+        questPhase
       })
     )
-  }, [stage, currentQuestIndex, selectedQuestIndex])
+  }, [stage, currentQuestIndex, selectedQuestIndex, questPhase])
 
   const handleGateSubmit = (event) => {
     event.preventDefault()
@@ -117,19 +157,21 @@ function App() {
     setBirthTime('')
     setDollarPrice('')
     setSelectedQuestIndex(currentQuestIndex)
+    setQuestPhase(QUEST_PHASE.PRIMARY)
     setStage(QUESTS.length ? STAGE.QUESTS : STAGE.FINISH)
   }
 
   const handleQuestSubmit = (event) => {
     event.preventDefault()
 
-    const currentQuest = QUESTS[currentQuestIndex]
     if (!currentQuest) {
       setStage(STAGE.FINISH)
       return
     }
 
-    const isCorrect = normalizeText(questAnswer) === normalizeText(currentQuest.answer)
+    const userAnswer = normalizeText(questAnswer)
+    const validAnswers = getQuestAnswerOptions(currentQuest)
+    const isCorrect = validAnswers.includes(userAnswer)
     if (!isCorrect) {
       setQuestError('Ответ неверный. Подумай еще.')
       return
@@ -137,6 +179,13 @@ function App() {
 
     setQuestError('')
     setQuestAnswer('')
+
+    if (currentQuestHasFollowUp) {
+      setFollowUpAnswer('')
+      setFollowUpError('')
+      setQuestPhase(QUEST_PHASE.FOLLOW_UP)
+      return
+    }
 
     const nextQuest = currentQuestIndex + 1
     if (nextQuest >= QUESTS.length) {
@@ -146,11 +195,42 @@ function App() {
 
     setCurrentQuestIndex(nextQuest)
     setSelectedQuestIndex(nextQuest)
+    setQuestPhase(QUEST_PHASE.PRIMARY)
+  }
+
+  const handleFollowUpSubmit = (event) => {
+    event.preventDefault()
+
+    if (!currentQuestHasFollowUp) {
+      return
+    }
+
+    const userAnswer = normalizeText(followUpAnswer)
+    const validAnswers = getFollowUpAnswerOptions(currentQuest)
+    const isCorrect = validAnswers.includes(userAnswer)
+    if (!isCorrect) {
+      setFollowUpError('Второй ответ неверный. Проверь место и попробуй снова.')
+      return
+    }
+
+    setFollowUpError('')
+    setFollowUpAnswer('')
+
+    const nextQuest = currentQuestIndex + 1
+    if (nextQuest >= QUESTS.length) {
+      setStage(STAGE.FINISH)
+      return
+    }
+
+    setCurrentQuestIndex(nextQuest)
+    setSelectedQuestIndex(nextQuest)
+    setQuestPhase(QUEST_PHASE.PRIMARY)
   }
 
   const handleTimelineClick = (index) => {
     if (index > currentQuestIndex) return
     setQuestError('')
+    setFollowUpError('')
     setSelectedQuestIndex(index)
   }
 
@@ -233,8 +313,8 @@ function App() {
       {stage === STAGE.QUESTS && (
         <section className="card roadmap-card">
           <h2>Неебический Квест</h2>
-          <p className="muted">Привет, Илья! Этот Неебический Квест создан специально в честь дня твоего рождения. Проходи задания и в конце тебя ждет маленький бонус.</p>
-
+          <p className="muted">Привет, Илья! Этот Неебический Квест создан специально в честь дня твоего рождения. Пройди все задания и в конце тебя ждет маленький бонус.</p>
+          <br></br>
           <div className="progress-shell">
             <div className="progress-meta">
               <span>
@@ -293,23 +373,60 @@ function App() {
               <p className="quest-detail-question">{selectedQuest.question}</p>
 
               {isSelectedCurrent ? (
-                <form onSubmit={handleQuestSubmit} className="form-stack quest-form">
-                  <label className="field">
-                    <span>Ответ</span>
-                    <input
-                      type="text"
-                      placeholder="Твой ответ"
-                      value={questAnswer}
-                      onChange={(event) => setQuestAnswer(event.target.value)}
-                      autoComplete="off"
-                      required
-                    />
-                  </label>
-                  {questError && <p className="error-text">{questError}</p>}
-                  <button type="submit" className="btn btn-primary">
-                    Ответить
-                  </button>
-                </form>
+                <>
+                  {questPhase === QUEST_PHASE.PRIMARY && (
+                    <form onSubmit={handleQuestSubmit} className="form-stack quest-form">
+                      <label className="field">
+                        <span>Ответ</span>
+                        <input
+                          type="text"
+                          placeholder="Твой ответ"
+                          value={questAnswer}
+                          onChange={(event) => setQuestAnswer(event.target.value)}
+                          autoComplete="off"
+                          required
+                        />
+                      </label>
+                      {questError && <p className="error-text">{questError}</p>}
+                      <button type="submit" className="btn btn-primary">
+                        Ответить
+                      </button>
+                    </form>
+                  )}
+
+                  {questPhase === QUEST_PHASE.FOLLOW_UP && currentQuestHasFollowUp && (
+                    <div className="followup-wrap">
+                      <div className="quest-photo-card">
+                        <img
+                          src={currentQuest.followUp.imagePath}
+                          alt={`Подсказка для ${currentQuest.title}`}
+                          className="quest-photo"
+                        />
+                      </div>
+                      <p className="followup-coordinates">
+                        Координаты: <strong>{currentQuest.followUp.coordinates}</strong>
+                      </p>
+
+                      <form onSubmit={handleFollowUpSubmit} className="form-stack quest-form">
+                        <label className="field">
+                          <span>{currentQuest.followUp.prompt || 'Напиши здесь то, что там найдешь'}</span>
+                          <input
+                            type="text"
+                            placeholder="Второй ответ"
+                            value={followUpAnswer}
+                            onChange={(event) => setFollowUpAnswer(event.target.value)}
+                            autoComplete="off"
+                            required
+                          />
+                        </label>
+                        {followUpError && <p className="error-text">{followUpError}</p>}
+                        <button type="submit" className="btn btn-primary">
+                          Подтвердить
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="muted">Этот квест уже выполнен. Выбери светящийся узел текущего квеста для ответа.</p>
               )}
@@ -331,8 +448,11 @@ function App() {
               }
               setCurrentQuestIndex(0)
               setSelectedQuestIndex(0)
+              setQuestPhase(QUEST_PHASE.PRIMARY)
               setQuestAnswer('')
+              setFollowUpAnswer('')
               setQuestError('')
+              setFollowUpError('')
               setStage(STAGE.WELCOME)
             }}
           >

@@ -318,6 +318,30 @@ input:focus {
   color: #ffe0e0;
 }
 
+.followup-wrap {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.quest-photo-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 126, 126, 0.35);
+  overflow: hidden;
+  background: rgba(19, 7, 10, 0.85);
+}
+
+.quest-photo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+.followup-coordinates {
+  margin: 0;
+  color: #ffdede;
+}
+
 .bg-glow {
   position: absolute;
   pointer-events: none;
