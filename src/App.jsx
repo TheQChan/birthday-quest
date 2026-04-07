@@ -161,15 +161,17 @@ function App() {
     }, 520)
   }
 
-  const gotoNextQuest = () => {
+  const gotoNextQuest = (options = {}) => {
+    const { keepSelectedOnCurrent = false } = options
     const nextQuest = currentQuestIndex + 1
     if (nextQuest >= QUESTS.length) {
       setStage(STAGE.FINISH)
       return
     }
 
+    const completedQuestIndex = currentQuestIndex
     setCurrentQuestIndex(nextQuest)
-    setSelectedQuestIndex(nextQuest)
+    setSelectedQuestIndex(keepSelectedOnCurrent ? completedQuestIndex : nextQuest)
     setQuestPhase(QUEST_PHASE.PRIMARY)
   }
 
@@ -231,7 +233,7 @@ function App() {
       return
     }
 
-    gotoNextQuest()
+    gotoNextQuest({ keepSelectedOnCurrent: true })
   }
 
   const handleFollowUpSubmit = (event) => {
@@ -253,7 +255,7 @@ function App() {
     setFollowUpError('')
     setFollowUpAnswer('')
     triggerDetailFx('success')
-    gotoNextQuest()
+    gotoNextQuest({ keepSelectedOnCurrent: true })
   }
 
   const handleTimelineClick = (index) => {
@@ -317,6 +319,7 @@ function App() {
   }
 
   const isSelectedCurrent = selectedQuestIndex === currentQuestIndex
+  const isSelectedDone = selectedQuestIndex < currentQuestIndex
 
   return (
     <main className="page-wrap">
@@ -452,7 +455,7 @@ function App() {
           {selectedQuest && (
             <div className={`quest-detail ${detailFx === 'success' ? 'quest-detail--success' : ''} ${detailFx === 'error' ? 'quest-detail--error' : ''}`}>
               <p className="quest-detail-title">{selectedQuest.title}</p>
-              <p className="quest-detail-question">{selectedQuest.question}</p>
+              {isSelectedCurrent && <p className="quest-detail-question">{selectedQuest.question}</p>}
 
               {isSelectedCurrent ? (
                 <>
@@ -510,6 +513,19 @@ function App() {
                     </div>
                   )}
                 </>
+              ) : isSelectedDone && selectedQuest.completionCard?.imagePath ? (
+                <div className="followup-wrap">
+                  <div className="quest-photo-card">
+                    <img
+                      src={resolveAssetPath(selectedQuest.completionCard.imagePath)}
+                      alt={`Фото друзей после ${selectedQuest.title}`}
+                      className="quest-photo"
+                    />
+                    <p className="quest-photo-caption">
+                      {selectedQuest.completionCard.caption || 'Квест выполнен'}
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <p className="muted">Этот квест уже выполнен. Выбери светящийся узел текущего квеста для ответа.</p>
               )}
@@ -527,7 +543,7 @@ function App() {
           <div className="certificate-preview">
             <p className="certificate-label">Сертификат</p>
             <p className="certificate-name">Илья</p>
-            <p className="certificate-meta">Пройдено квестов: {QUESTS.length}</p>
+            <p className="certificate-meta">Пройдено заданий: {QUESTS.length}</p>
             <p className="certificate-meta">Дата: {new Date().toLocaleDateString('ru-RU')}</p>
           </div>
           <br></br>
