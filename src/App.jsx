@@ -305,7 +305,7 @@ function App() {
 
     ctx.fillStyle = '#ffbcbc'
     ctx.font = '500 36px Manrope'
-    ctx.fillText(`Квестов закрыто: ${QUESTS.length}`, 120, 500)
+    ctx.fillText(`Заданий выполнено: ${QUESTS.length}`, 120, 500)
     ctx.fillText(`Дата: ${new Date().toLocaleDateString('ru-RU')}`, 120, 560)
 
     ctx.fillStyle = '#ffd8d8'
@@ -538,8 +538,7 @@ function App() {
         <section className="card finish-card certificate-card">
           <p className="eyebrow">Mission Complete</p>
           <h2>Квест завершен</h2>
-          <p className="lead-text">С днем рождения, Илья! Пусть этот год будет ярким и сильным.</p>
-          
+          <p className="lead-text">С днем рождения, Илья! Пусть этот год будет ярким и сильным. <br></br><b>Для получение приза обратись к Александру.</b></p>
           <div className="certificate-preview">
             <p className="certificate-label">Сертификат</p>
             <p className="certificate-name">Илья</p>
